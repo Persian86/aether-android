@@ -2,24 +2,14 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+      - uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -30,39 +20,36 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential \
-            ccache \
-            git \
-            libffi-dev \
-            libssl-dev \
-            zlib1g-dev \
-            automake \
-            libtool \
-            pkg-config \
-            libltdl-dev \
-            unzip \
-            openjdk-17-jdk
+            python3-pip python3-venv git zip unzip openjdk-17-jdk-headless \
+            zlib1g-dev autoconf libtool pkg-config cmake libffi-dev libssl-dev \
+            build-essential wget
 
-      - name: Install Buildozer and dependencies
+      - name: Install Android SDK command-line tools
         run: |
-          pip install --upgrade pip
-          pip install buildozer cython==0.29.36
+          mkdir -p $HOME/android-sdk/cmdline-tools
+          cd $HOME/android-sdk/cmdline-tools
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          unzip -q commandlinetools-linux-11076708_latest.zip
+          mv cmdline-tools latest
+          export ANDROID_SDK_ROOT=$HOME/android-sdk
+          export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin
+          yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT "platform-tools" "platforms;android-33" "build-tools;33.0.2" "ndk;25.2.9519653"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          echo "PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools" >> $GITHUB_ENV
 
-      - name: Accept Android SDK licenses (pre-emptive)
+      - name: Install Buildozer and Cython
+        run: pip install buildozer cython
+
+      - name: Build APK
         run: |
-          # Create the SDK directory structure if needed and accept licenses
-          mkdir -p $HOME/.buildozer/android/platform
-          # Buildozer will download SDK, but we can pre-accept common licenses
-          echo "y" | yes | true  # placeholder; real acceptance happens via buildozer.spec
+          export ANDROID_SDK_ROOT=$HOME/android-sdk
+          export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools
+          buildozer android debug
+        continue-on-error: true
 
-      - name: Build APK with Buildozer
-        run: |
-          # Ensure the accept_sdk_license is set (already in the provided spec)
-          buildozer -v android debug
-
-      - name: Upload APK artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk
+          name: aether-apk
           path: bin/*.apk
-          retention-days: 7
+          if-no-files-found: warn

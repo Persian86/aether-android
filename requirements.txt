@@ -1,0 +1,9 @@
+# Aether Android — Kivy AI Assistant
+# Build APK with Buildozer
+
+kivy>=2.3.0
+kivymd>=1.2.0
+requests>=2.31.0
+google-generativeai>=0.8.0
+# Android speech via plyer or android APIs
+plyer>=2.1.0

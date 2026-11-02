@@ -10,19 +10,43 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-pip python3-venv git zip unzip openjdk-17-jdk-headless zlib1g-dev autoconf libtool pkg-config cmake libffi-dev libssl-dev build-essential
+          sudo apt-get install -y \
+            python3-pip python3-venv git zip unzip openjdk-17-jdk-headless \
+            zlib1g-dev autoconf libtool pkg-config cmake libffi-dev libssl-dev \
+            build-essential wget
+
+      - name: Install Android SDK command-line tools
+        run: |
+          mkdir -p $HOME/android-sdk/cmdline-tools
+          cd $HOME/android-sdk/cmdline-tools
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          unzip -q commandlinetools-linux-11076708_latest.zip
+          mv cmdline-tools latest
+          export ANDROID_SDK_ROOT=$HOME/android-sdk
+          export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin
+          yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT "platform-tools" "platforms;android-33" "build-tools;33.0.2" "ndk;25.2.9519653"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          echo "PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools" >> $GITHUB_ENV
+
       - name: Install Buildozer and Cython
         run: pip install buildozer cython
+
       - name: Build APK
-        run: buildozer android debug
+        run: |
+          export ANDROID_SDK_ROOT=$HOME/android-sdk
+          export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools
+          buildozer android debug
         continue-on-error: true
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
